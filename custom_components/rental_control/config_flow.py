@@ -355,10 +355,9 @@ async def _start_config_flow(
                     errors[CONF_URL] = "unknown"
                 else:
                     # We require text/calendar in the content-type header
-                    if "text/calendar" not in resp.content_type:
+                    if "text/calendar" not in resp.content_type and "text/plain" not in resp.content_type:
                         errors[CONF_URL] = "bad_ics"
-        except vol.Invalid as err:
-            _LOGGER.exception(err.msg)
+        except vol.Invalid:
             errors[CONF_URL] = "invalid_url"
 
         if (
@@ -369,14 +368,12 @@ async def _start_config_flow(
 
         try:
             cv.time(user_input[CONF_CHECKIN])
-        except vol.Invalid as err:
-            _LOGGER.exception(err.msg)
+        except vol.Invalid:
             errors[CONF_CHECKIN] = "bad_time"
 
         try:
             cv.time(user_input[CONF_CHECKOUT])
-        except vol.Invalid as err:
-            _LOGGER.exception(err.msg)
+        except vol.Invalid:
             errors[CONF_CHECKOUT] = "bad_time"
 
         if user_input[CONF_DAYS] < 1:

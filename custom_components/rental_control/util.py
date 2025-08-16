@@ -319,6 +319,13 @@ def get_slot_name(summary: str, description: str, prefix: str) -> str | None:
         if len(ret):
             return str(ret[0]).strip()
 
+    # LekkeSlaap
+    if "LS-" in name:
+        p = re.compile(r"(LS-[A-Z0-9]{6})")
+        ret = p.findall(name)
+        if len(ret):
+            return str(ret[0]).strip()
+
     # Booking.com
     if "CLOSED" in name:
         p = re.compile(r"\s*CLOSED - (.*)")

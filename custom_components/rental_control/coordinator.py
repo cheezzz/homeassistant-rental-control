@@ -21,6 +21,7 @@ from datetime import datetime
 from datetime import time
 from datetime import timedelta
 import logging
+import re
 from typing import Any
 from typing import Dict
 from zoneinfo import ZoneInfo  # noreorder
@@ -336,6 +337,23 @@ class RentalControlCoordinator:
                 except Exception:  # pylint: disable=broad-except
                     pass
 
+                # Handle missing SUMMARY field (e.g., LekkeSlaap events)
+                # Extract booking reference from DESCRIPTION if SUMMARY is missing
+                if "SUMMARY" not in event:
+                    if "DESCRIPTION" in event:
+                        description = event["DESCRIPTION"]
+                        # Extract LekkeSlaap booking reference from DESCRIPTION
+                        p = re.compile(r"Reference: (LS-[A-Z0-9]{6})")
+                        ret = p.findall(str(description))
+                        if ret:
+                            event["SUMMARY"] = ret[0]
+                        else:
+                            # Fallback to first line of description or generic title
+                            first_line = str(description).split('\n')[0]
+                            event["SUMMARY"] = first_line if first_line else "Booking"
+                    else:
+                        event["SUMMARY"] = "Booking"
+
                 # Ignore Blocked or Not available by default, but if false,
                 # keep the events.
                 if (
@@ -353,6 +371,9 @@ class RentalControlCoordinator:
                 else:
                     # VRBO and Booking.com do not have a DESCRIPTION element
                     slot_name = get_slot_name(event["SUMMARY"], "", "")
+
+                if "View at:" in event["SUMMARY"]:
+                    event["SUMMARY"] = event["SUMMARY"].split("View at:")[0].strip()
 
                 override = None
                 if slot_name and self.event_overrides:
@@ -440,13 +461,7 @@ class RentalControlCoordinator:
 
         def _get_date(day: date | datetime) -> date:
             """Return the date from a datetime or date object."""
-
-            _LOGGER.debug("In _get_date: %s", day)
-            if isinstance(day, date):
-                _LOGGER.debug("Returning date: %s", day)
-                return day
-            _LOGGER.debug("Returning date: %s", day.date())
-            return day.date()
+            return getattr(day, "date", day)
 
         cal = self.calendar
         days = dt.start_of_local_day() + timedelta(days=self.days)
