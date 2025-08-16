@@ -1,4 +1,6 @@
 
+# SPDX-FileCopyrightText: 2024 Claude Code Assistant
+# SPDX-License-Identifier: Apache-2.0
 
 import icalendar
 
