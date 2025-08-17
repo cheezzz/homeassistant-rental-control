@@ -27,13 +27,19 @@ from typing import Dict
 from zoneinfo import ZoneInfo  # noreorder
 
 import async_timeout
+from homeassistant.components.button import DOMAIN as BUTTON
+from homeassistant.components.datetime import DOMAIN as DATETIME
+from homeassistant.components.text import DOMAIN as TEXT
+from homeassistant.components.switch import DOMAIN as SWITCH
 from homeassistant.components.calendar import CalendarEvent
+from homeassistant.components.persistent_notification import async_create
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_NAME
 from homeassistant.const import CONF_URL
 from homeassistant.const import CONF_VERIFY_SSL
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import homeassistant.helpers.config_validation as cv
 from homeassistant.util import dt
@@ -125,6 +131,24 @@ class RentalControlCoordinator:
             sw_version=self.version,
         )
 
+        entity_registry = er.async_get(hass)
+        if self.lockname:
+            reset_entity = (
+                f"{BUTTON}.{self.lockname.lower()}_code_slot_{self.start_slot}_reset"
+            )
+            has_reset = entity_registry.async_get(reset_entity)
+            if has_reset is None:
+                error_msg = """
+The version of Keymaster is incompatible with this version of Rental Control.
+Please update Keymaster to at least v0.1.0-b0
+"""
+                _LOGGER.error(error_msg)
+                async_create(
+                    hass,
+                    error_msg,
+                    title="Keymaster Incompatible Version",
+                )
+
     @property
     def device_info(self) -> dr.DeviceInfo:
         """Return the device info block."""
@@ -209,32 +233,65 @@ class RentalControlCoordinator:
         # Get slot overrides on startup
         if not self.calendar_ready and self.lockname:
             for i in range(self.start_slot, self.start_slot + self.max_events):
-                slot_code = self.hass.states.get(f"input_text.{self.lockname}_pin_{i}")
+                slot_code = self.hass.states.get(
+                    f"{TEXT}.{self.lockname}_code_slot_{i}_pin"
+                )
+                _LOGGER.debug("Slot code: '%s'", slot_code)
                 if slot_code is None:
                     continue
+                if slot_code.state == "unknown" or slot_code.state == "unavailable":
+                    slot_code.state = ""
 
-                slot_name = self.hass.states.get(f"input_text.{self.lockname}_name_{i}")
+                slot_name = self.hass.states.get(
+                    f"{TEXT}.{self.lockname}_code_slot_{i}_name"
+                )
+                _LOGGER.debug("Slot name: '%s'", slot_name)
                 if slot_name is None:
                     continue
+                if slot_name.state == "unknown" or slot_name.state == "unavailable":
+                    slot_name.state = ""
 
-                start_time_state = self.hass.states.get(
-                    f"input_datetime.start_date_{self.lockname}_{i}"
+                use_date_range = self.hass.states.get(
+                    f"{SWITCH}.{self.lockname}_code_slot_{i}_use_date_range_limits"
                 )
-                if start_time_state is None:
-                    continue
-                start_time = dt.parse_datetime(start_time_state.state)
-                if start_time is None:
-                    continue
+                if use_date_range and use_date_range.state == "on":
+                    start_time_state = self.hass.states.get(
+                        f"{DATETIME}.{self.lockname}_code_slot_{i}_date_range_start"
+                    )
+                    _LOGGER.debug("Start time: '%s'", start_time_state)
+                    if start_time_state is None:
+                        continue
+                    start_datetime = dt.parse_datetime(start_time_state.state)
+                    _LOGGER.debug("Start time: '%s'", start_datetime)
+                    if start_datetime is None:
+                        continue
+                    start_time = start_datetime
 
-                end_time_state = self.hass.states.get(
-                    f"input_datetime.end_date_{self.lockname}_{i}"
+                    end_time_state = self.hass.states.get(
+                        f"{DATETIME}.{self.lockname}_code_slot_{i}_date_range_end"
+                    )
+                    _LOGGER.debug("End time: '%s'", end_time_state)
+                    if end_time_state is None:
+                        continue
+                    end_datetime = dt.parse_datetime(end_time_state.state)
+                    _LOGGER.debug("End time: '%s'", end_datetime)
+                    if end_datetime is None:
+                        continue
+                    else:
+                        end_time = end_datetime
+                else:
+                    start_time = dt.start_of_local_day()
+                    end_time = dt.start_of_local_day() + timedelta(days=1)
+
+                _LOGGER.debug(
+                    "Slot %d: %s, %s, %s, %s",
+                    i,
+                    slot_code.state,
+                    slot_name.state,
+                    start_time,
+                    end_time,
                 )
-                if end_time_state is None:
-                    continue
-                end_time = dt.parse_datetime(end_time_state.state)
-                if end_time is None:
-                    continue
-
+                _LOGGER.debug("Updating event overrides")
                 await self.update_event_overrides(
                     i,
                     slot_code.state,
@@ -286,7 +343,12 @@ class RentalControlCoordinator:
         # temporary call new_update_event_overrides
         if self.event_overrides:
             self.event_overrides.update(
-                slot, slot_code, slot_name, start_time, end_time, self.event_prefix
+                slot,
+                slot_code,
+                slot_name,
+                start_time,
+                end_time,
+                self.event_prefix,
             )
 
             if self.event_overrides.ready and self.calendar_loaded:
@@ -299,7 +361,7 @@ class RentalControlCoordinator:
         self.next_refresh = dt.now()
 
     async def _ical_parser(
-        self, calendar: Calendar, from_date: dt.dt.datetime, to_date: dt.dt.datetime
+        self, calendar: Calendar, from_date: datetime, to_date: datetime
     ) -> list[CalendarEvent]:
         """Return a sorted list of events from a icalendar object."""
 
@@ -380,35 +442,54 @@ class RentalControlCoordinator:
                     override = self.event_overrides.get_slot_with_name(slot_name)
 
                 if override:
-                    checkin: time = override["start_time"].time()
-                    checkout: time = override["end_time"].time()
+                    # Get start & end overrides in the correct timezone
+                    # Overrides are stored in UTC since Keymaster's time
+                    # start end end configurations values are in UTC
+                    start_time: datetime = override["start_time"].astimezone(
+                        self.timezone
+                    )
+                    end_time: datetime = override["end_time"].astimezone(self.timezone)
+                    checkin: time = start_time.time()
+                    checkout: time = end_time.time()
+                    _LOGGER.debug("Checkin: %s, Checkout: %s", checkin, checkout)
                 else:
                     try:
                         # If the event has a time, use that, otherwise use the
                         # default checkin/checkout times
+                        # No need to do tz conversion here, as the
+                        # DTSTART and DTEND are already in the correct timezone
                         checkin = event["DTSTART"].dt.time()
                         checkout = event["DTEND"].dt.time()
                     except AttributeError:
                         checkin = self.checkin
                         checkout = self.checkout
 
+                _LOGGER.debug("Checkin: %s, Checkout: %s", checkin, checkout)
                 _LOGGER.debug("DTSTART in event: %s", event["DTSTART"].dt)
-                dtstart = datetime.combine(event["DTSTART"].dt, checkin, self.timezone)
+                dtstart: datetime = datetime.combine(
+                    event["DTSTART"].dt, checkin, self.timezone
+                )
+                # convert dtstart to UTC
+                dtstart = dt.as_utc(dtstart)
 
-                start = dtstart
+                start: datetime = dtstart
 
                 if "DTEND" not in event:
-                    dtend = dtstart
+                    dtend: datetime = dtstart
                 else:
                     _LOGGER.debug("DTEND in event: %s", event["DTEND"].dt)
                     dtend = datetime.combine(event["DTEND"].dt, checkout, self.timezone)
+                # convert dtend to UTC
+                dtend = dt.as_utc(dtend)
                 end = dtend
 
                 # Modify the SUMMARY if we have an event_prefix
                 if self.event_prefix:
                     event["SUMMARY"] = self.event_prefix + " " + event["SUMMARY"]
 
-                cal_event = await self._ical_event(start, end, from_date, event)
+                cal_event: CalendarEvent | None = await self._ical_event(
+                    start, end, from_date, event
+                )
                 if cal_event:
                     events.append(cal_event)
 
@@ -423,9 +504,14 @@ class RentalControlCoordinator:
         event: Dict[Any, Any],
     ) -> CalendarEvent | None:
         """Ensure that events are within the start and end."""
+        _LOGGER.debug(
+            "Running _ical_event for %s", str(event.get("SUMMARY", "Unknown"))
+        )
+        _LOGGER.debug("Start: %s, End: %s", start, end)
+        _LOGGER.debug("From: %s", from_date)
         # Ignore events that ended this midnight.
-        if (end.date() < from_date.date()) or (
-            end.date() == from_date.date()
+        if (dt.as_utc(end) < dt.as_utc(from_date)) or (
+            dt.as_utc(end).date() == dt.as_utc(from_date).date()
             and end.hour == 0
             and end.minute == 0
             and end.second == 0
