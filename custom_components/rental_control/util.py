@@ -275,10 +275,10 @@ def get_slot_name(summary: str, description: str, prefix: str) -> str | None:
     else:
         name = summary
 
-    # Blocked and Unavailable should not have anything
+    # Blocked and Unavailable events should be treated as active bookings
     p = re.compile("Not available|Blocked")
     if p.search(name):
-        return None
+        return "Blocked"
 
     # Airbnb and VRBO
     if "Reserved" in name:
