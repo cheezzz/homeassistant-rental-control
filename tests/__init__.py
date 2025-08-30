@@ -1,0 +1,7 @@
+# SPDX-FileCopyrightText: 2021 Andrew Grimberg <tykeal@bardicgrove.org>
+# SPDX-License-Identifier: Apache-2.0
+
+"""Tests package for rental_control component."""
+
+__all__ = []
+
