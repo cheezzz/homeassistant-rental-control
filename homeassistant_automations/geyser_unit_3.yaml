@@ -1,0 +1,86 @@
+alias: Geyser - Sync with rental calendars (Unit 3)
+description: ""
+mode: queued
+max: 2
+triggers:
+  - trigger: state
+    entity_id:
+      - calendar.rental_control_airbnb_unit_3
+      - calendar.rental_control_lekkeslaap_unit_3
+  - trigger: homeassistant
+    event: start
+  - trigger: time_pattern
+    minutes: "/5"
+conditions: []
+actions:
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.platform == 'homeassistant' }}"
+        sequence:
+          - wait_template: >-
+              {{ states('calendar.rental_control_airbnb_unit_3') not in ['unknown','unavailable']
+                 and states('calendar.rental_control_lekkeslaap_unit_3') not in ['unknown','unavailable']
+                 and states('switch.unit_3_geyser_switch') not in ['unknown','unavailable'] }}
+            timeout: "00:02:00"
+            continue_on_timeout: true
+  - condition: template
+    value_template: >-
+      {{ states('calendar.rental_control_airbnb_unit_3') not in ['unknown','unavailable']
+         and states('calendar.rental_control_lekkeslaap_unit_3') not in ['unknown','unavailable']
+         and states('switch.unit_3_geyser_switch') not in ['unknown','unavailable'] }}
+  - variables:
+      any_booking_on: >-
+        {{ is_state('calendar.rental_control_airbnb_unit_3','on')
+           or is_state('calendar.rental_control_lekkeslaap_unit_3','on') }}
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ any_booking_on }}"
+        sequence:
+          - condition: state
+            entity_id: switch.unit_3_geyser_switch
+            state: "off"
+          - repeat:
+              count: 3
+              sequence:
+                - action: switch.turn_on
+                  target:
+                    entity_id: switch.unit_3_geyser_switch
+                - wait_template: "{{ is_state('switch.unit_3_geyser_switch','on') }}"
+                  timeout: "00:00:10"
+                  continue_on_timeout: false
+          - condition: state
+            entity_id: switch.unit_3_geyser_switch
+            state: "on"
+          - choose: []
+            default:
+              - action: system_log.write
+                data:
+                  level: warning
+                  message: "Unit 3 geyser failed to turn ON after retries."
+      - conditions:
+          - condition: template
+            value_template: "{{ not any_booking_on }}"
+        sequence:
+          - condition: state
+            entity_id: switch.unit_3_geyser_switch
+            state: "on"
+          - repeat:
+              count: 3
+              sequence:
+                - action: switch.turn_off
+                  target:
+                    entity_id: switch.unit_3_geyser_switch
+                - wait_template: "{{ is_state('switch.unit_3_geyser_switch','off') }}"
+                  timeout: "00:00:10"
+                  continue_on_timeout: false
+          - condition: state
+            entity_id: switch.unit_3_geyser_switch
+            state: "off"
+          - choose: []
+            default:
+              - action: system_log.write
+                data:
+                  level: warning
+                  message: "Unit 3 geyser failed to turn OFF after retries."

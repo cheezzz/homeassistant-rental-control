@@ -1,0 +1,141 @@
+blueprint:
+  name: Geyser sync with rental calendars
+  description: >-
+    Turns a geyser switch on when any selected rental calendars are "on",
+    and off when none are "on". Includes availability checks, retries,
+    and polling. Works well with rental_control calendars.
+  domain: automation
+  input:
+    geyser_switch:
+      name: Geyser switch
+      selector:
+        entity:
+          domain: switch
+    calendars:
+      name: Rental calendars
+      description: One or more calendar entities to monitor
+      selector:
+        entity:
+          multiple: true
+          domain: calendar
+    poll_every_minutes:
+      name: Poll interval (minutes)
+      default: 5
+      selector:
+        number:
+          min: 1
+          max: 60
+          mode: slider
+          unit_of_measurement: min
+          step: 1
+    max_queue:
+      name: Max queued runs
+      default: 2
+      selector:
+        number:
+          min: 1
+          max: 5
+          mode: slider
+          step: 1
+
+mode: queued
+max: !input max_queue
+
+triggers:
+  - trigger: state
+    entity_id: !input calendars
+  - trigger: homeassistant
+    event: start
+  - trigger: time_pattern
+    minutes: "*"
+
+conditions: []
+
+variables:
+  geyser: !input geyser_switch
+  cal_list: !input calendars
+  poll_every: !input poll_every_minutes
+
+actions:
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.platform == 'time_pattern' }}"
+          - condition: template
+            value_template: "{{ (now().minute % (poll_every | int)) == 0 }}"
+        sequence: []
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.platform == 'homeassistant' }}"
+        sequence:
+          - wait_template: >-
+              {{
+                cal_list | map('states') | list | select('in', ['unknown','unavailable']) | list | length == 0
+                and states(geyser) not in ['unknown','unavailable']
+              }}
+            timeout: "00:02:00"
+            continue_on_timeout: true
+
+  - condition: template
+    value_template: >-
+      {{
+        cal_list | map('states') | list | select('in', ['unknown','unavailable']) | list | length == 0
+        and states(geyser) not in ['unknown','unavailable']
+      }}
+
+  - variables:
+      any_booking_on: >-
+        {{ cal_list | select('is_state', 'on') | list | length > 0 }}
+
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ any_booking_on }}"
+        sequence:
+          - condition: state
+            entity_id: !input geyser_switch
+            state: "off"
+          - repeat:
+              count: 3
+              sequence:
+                - action: switch.turn_on
+                  target:
+                    entity_id: !input geyser_switch
+                - wait_template: "{{ is_state(geyser,'on') }}"
+                  timeout: "00:00:10"
+                  continue_on_timeout: false
+          - condition: state
+            entity_id: !input geyser_switch
+            state: "on"
+          - choose: []
+            default:
+              - action: system_log.write
+                data:
+                  level: warning
+                  message: "Geyser failed to turn ON after retries."
+
+      - conditions:
+          - condition: template
+            value_template: "{{ not any_booking_on }}"
+        sequence:
+          - condition: state
+            entity_id: !input geyser_switch
+            state: "on"
+          - repeat:
+              count: 3
+              sequence:
+                - action: switch.turn_off
+                  target:
+                    entity_id: !input geyser_switch
+                - wait_template: "{{ is_state(geyser,'off') }}"
+                  timeout: "00:00:10"
+                  continue_on_timeout: false
+          - condition: state
+            entity_id: !input geyser_switch
+            state: "off"
+          - choose: []
+            default:
+              - action: system_log.write
+                data:
+                  level: warning
+                  message: "Geyser failed to turn OFF after retries."

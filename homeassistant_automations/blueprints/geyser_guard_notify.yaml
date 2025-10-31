@@ -1,0 +1,127 @@
+blueprint:
+  name: Geyser guard – notify when off during booking
+  description: >-
+    Notifies if any selected rental calendars are ON but the geyser switch is
+    OFF or unavailable. Includes poll interval and a cooldown to avoid spam.
+  domain: automation
+  input:
+    geyser_switch:
+      name: Geyser switch
+      selector:
+        entity:
+          domain: switch
+    calendars:
+      name: Rental calendars
+      selector:
+        entity:
+          multiple: true
+          domain: calendar
+    notify_target:
+      name: Notify service
+      description: e.g. notify.mobile_app_your_phone or notify.notify
+      selector:
+        text:
+    notification_title:
+      name: Notification title
+      default: Hot water alert
+      selector:
+        text:
+    notification_message:
+      name: Notification message
+      default: Guests booked, but the geyser is OFF or unavailable.
+      selector:
+        text:
+    poll_every_minutes:
+      name: Poll interval (minutes)
+      default: 5
+      selector:
+        number:
+          min: 1
+          max: 60
+          step: 1
+          mode: slider
+    cooldown_minutes:
+      name: Cooldown between alerts (minutes)
+      description: Minimum time between notifications
+      default: 30
+      selector:
+        number:
+          min: 1
+          max: 240
+          step: 1
+          mode: slider
+
+mode: queued
+max: 2
+
+triggers:
+  - trigger: state
+    entity_id: !input calendars
+  - trigger: homeassistant
+    event: start
+  - trigger: time_pattern
+    minutes: "*"
+
+variables:
+  geyser: !input geyser_switch
+  cal_list: !input calendars
+  poll_every: !input poll_every_minutes
+  cooldown: !input cooldown_minutes
+  notify_svc: !input notify_target
+  title: !input notification_title
+  message: !input notification_message
+
+conditions: []
+
+actions:
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.platform == 'time_pattern' }}"
+          - condition: template
+            value_template: "{{ (now().minute % (poll_every | int)) == 0 }}"
+        sequence: []
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.platform == 'homeassistant' }}"
+        sequence: []
+
+  - variables:
+      any_booking_on: "{{ cal_list | select('is_state', 'on') | list | length > 0 }}"
+      geyser_unavailable: "{{ states(geyser) in ['unknown','unavailable'] }}"
+      geyser_off: "{{ is_state(geyser, 'off') }}"
+      on_cal_names: >-
+        {{ cal_list | select('is_state','on') | map('replace', 'calendar.', '') | list | join(', ') }}
+
+  - condition: template
+    value_template: "{{ any_booking_on and (geyser_off or geyser_unavailable) }}"
+
+  # Self-heal: if geyser is available but off, try to turn it on and wait up to 20s
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ not geyser_unavailable and geyser_off }}"
+        sequence:
+          - action: switch.turn_on
+            target:
+              entity_id: !input geyser_switch
+          - wait_template: "{{ is_state(geyser, 'on') }}"
+            timeout: "00:00:20"
+            continue_on_timeout: true
+
+  - condition: template
+    value_template: >-
+      {{ (as_timestamp(now()) - (state_attr(this.entity_id, 'last_triggered') | default(0) | as_timestamp(0))) / 60
+         >= (cooldown | int) }}
+
+  # Notify only if still off or unavailable after self-heal attempt
+  - condition: template
+    value_template: "{{ is_state(geyser, 'off') or states(geyser) in ['unknown','unavailable'] }}"
+
+  - action: "{{ notify_svc }}"
+    data:
+      title: "{{ title }}"
+      message: >-
+        {{ message }}
+        Calendars ON: {{ on_cal_names if on_cal_names else 'n/a' }}.
+        Geyser state: {{ states(geyser) }}.
