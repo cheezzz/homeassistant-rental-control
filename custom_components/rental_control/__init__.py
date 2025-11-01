@@ -257,6 +257,35 @@ async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) ->
         version = 7
         _LOGGER.debug(f"Migration to version {config_entry.version} complete")
 
+    # 7 -> 8: Add check-in link configuration
+    if version == 7:
+        _LOGGER.debug(f"Migrating from version {version}")
+
+        from .const import CONF_CHECKIN_LINK_ENABLED
+        from .const import CONF_CHECKIN_LINK_PATH
+        from .const import CONF_CHECKIN_BASE_URL
+        from .const import CONF_CHECKIN_SIGNING_SECRET
+        from .const import DEFAULT_CHECKIN_LINK_ENABLED
+        from .const import DEFAULT_CHECKIN_LINK_PATH
+        from .const import DEFAULT_CHECKIN_BASE_URL
+        from .const import DEFAULT_CHECKIN_SIGNING_SECRET
+
+        data = config_entry.data.copy()
+        # Default to disabled for existing installations
+        data[CONF_CHECKIN_LINK_ENABLED] = DEFAULT_CHECKIN_LINK_ENABLED
+        data[CONF_CHECKIN_LINK_PATH] = DEFAULT_CHECKIN_LINK_PATH
+        data[CONF_CHECKIN_BASE_URL] = DEFAULT_CHECKIN_BASE_URL
+        data[CONF_CHECKIN_SIGNING_SECRET] = DEFAULT_CHECKIN_SIGNING_SECRET
+        hass.config_entries.async_update_entry(
+            entry=config_entry,
+            unique_id=config_entry.unique_id,
+            data=data,
+            version=8,
+        )
+
+        version = 8
+        _LOGGER.debug(f"Migration to version {config_entry.version} complete")
+
     return True
 
 

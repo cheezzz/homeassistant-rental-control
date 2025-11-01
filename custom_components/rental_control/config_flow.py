@@ -75,7 +75,7 @@ sorted_tz.sort()
 class RentalControlFlowHandler(config_entries.ConfigFlow):
     """Handle the config flow for Rental Control."""
 
-    VERSION = 7
+    VERSION = 8
 
     DEFAULTS = {
         CONF_CHECKIN: DEFAULT_CHECKIN,

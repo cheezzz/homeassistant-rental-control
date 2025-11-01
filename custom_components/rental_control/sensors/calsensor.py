@@ -221,37 +221,45 @@ class RentalControlCalSensor(Entity):
             Signed URL string, or None if feature is disabled or not check-in day
 
         """
-        # Check if feature is enabled
-        if not self.coordinator.checkin_link_enabled:
+        try:
+            # Check if feature is enabled
+            if not self.coordinator.checkin_link_enabled:
+                return None
+
+            # Check if path is set (not "none")
+            if self.coordinator.checkin_link_path == "none":
+                return None
+
+            # Check if we have a valid start time
+            start = self._event_attributes.get("start")
+            if not start:
+                return None
+
+            # Check if today is check-in day and time >= 06:00 AM
+            # Use Home Assistant's timezone-aware now() utility
+            now = dt.now(start.tzinfo)
+            is_checkin_day = start.date() == now.date()
+            is_past_6am = now.time() >= time(6, 0)
+
+            if not (is_checkin_day and is_past_6am):
+                return None
+
+            # Generate the link
+            from ..checkin_links import generate_checkin_link
+
+            return generate_checkin_link(
+                base_url=self.coordinator.checkin_base_url,
+                path=self.coordinator.checkin_link_path,
+                secret=self.coordinator.checkin_signing_secret,
+                expires_in_seconds=86400,  # 24 hours
+            )
+        except Exception as e:  # pylint: disable=broad-except
+            _LOGGER.error(
+                "Failed to generate check-in link for %s: %s",
+                self.name,
+                str(e),
+            )
             return None
-
-        # Check if path is set (not "none")
-        if self.coordinator.checkin_link_path == "none":
-            return None
-
-        # Check if we have a valid start time
-        start = self._event_attributes.get("start")
-        if not start:
-            return None
-
-        # Check if today is check-in day and time >= 06:00 AM
-        # Use Home Assistant's timezone-aware now() utility
-        now = dt.now(start.tzinfo)
-        is_checkin_day = start.date() == now.date()
-        is_past_6am = now.time() >= time(6, 0)
-
-        if not (is_checkin_day and is_past_6am):
-            return None
-
-        # Generate the link
-        from ..checkin_links import generate_checkin_link
-
-        return generate_checkin_link(
-            base_url=self.coordinator.checkin_base_url,
-            path=self.coordinator.checkin_link_path,
-            secret=self.coordinator.checkin_signing_secret,
-            expires_in_seconds=86400,  # 24 hours
-        )
 
     @property
     def available(self):

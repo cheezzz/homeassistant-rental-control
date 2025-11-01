@@ -133,17 +133,21 @@ class RentalControlCoordinator:
         self.event: CalendarEvent | None = None
         self.created: str = config.get(CONF_CREATION_DATETIME, str(dt.now()))
         self._version: str = VERSION
+        # Check-in link configuration with safe defaults
         self.checkin_link_enabled: bool = bool(
             config.get(CONF_CHECKIN_LINK_ENABLED, DEFAULT_CHECKIN_LINK_ENABLED)
         )
-        self.checkin_link_path: str = str(
-            config.get(CONF_CHECKIN_LINK_PATH, DEFAULT_CHECKIN_LINK_PATH)
+        checkin_link_path = config.get(CONF_CHECKIN_LINK_PATH, DEFAULT_CHECKIN_LINK_PATH)
+        self.checkin_link_path: str = (
+            str(checkin_link_path) if checkin_link_path is not None else DEFAULT_CHECKIN_LINK_PATH
         )
-        self.checkin_base_url: str = str(
-            config.get(CONF_CHECKIN_BASE_URL, DEFAULT_CHECKIN_BASE_URL)
+        checkin_base_url = config.get(CONF_CHECKIN_BASE_URL, DEFAULT_CHECKIN_BASE_URL)
+        self.checkin_base_url: str = (
+            str(checkin_base_url) if checkin_base_url is not None else DEFAULT_CHECKIN_BASE_URL
         )
-        self.checkin_signing_secret: str = str(
-            config.get(CONF_CHECKIN_SIGNING_SECRET, DEFAULT_CHECKIN_SIGNING_SECRET)
+        checkin_signing_secret = config.get(CONF_CHECKIN_SIGNING_SECRET, DEFAULT_CHECKIN_SIGNING_SECRET)
+        self.checkin_signing_secret: str = (
+            str(checkin_signing_secret) if checkin_signing_secret is not None else DEFAULT_CHECKIN_SIGNING_SECRET
         )
 
         # setup device
