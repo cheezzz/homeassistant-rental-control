@@ -1,7 +1,16 @@
 <!--- SPDX-License-Identifier: Apache-2.0 -->
 <!--- SPDX-FileCopyrightText: 2021 Andrew Grimberg <tykeal@bardicgrove.org. -->
 
-# Rental Control management for Home Assistant
+# Rental Control - LekkeSlaap Compatible Fork
+
+This is a fork of [homeassistant-rental-control](https://github.com/tykeal/homeassistant-rental-control) by tykeal, modified to add LekkeSlaap compatibility.
+
+## Changes from Original
+- Added LekkeSlaap integration support
+- [List other changes you made]
+
+## Original Project
+Original project by Andrew Grimberg (tykeal): https://github.com/tykeal/homeassistant-rental-control
 
 [![pre-commit.ci status](https://results.pre-commit.ci/badge/github/tykeal/homeassistant-rental-control/main.svg)](https://results.pre-commit.ci/latest/github/tykeal/homeassistant-rental-control/main)
 
