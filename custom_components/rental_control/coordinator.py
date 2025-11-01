@@ -61,6 +61,14 @@ from .const import CONF_REFRESH_FREQUENCY
 from .const import CONF_SHOULD_UPDATE_CODE
 from .const import CONF_START_SLOT
 from .const import CONF_TIMEZONE
+from .const import CONF_CHECKIN_LINK_ENABLED
+from .const import CONF_CHECKIN_LINK_PATH
+from .const import CONF_CHECKIN_BASE_URL
+from .const import CONF_CHECKIN_SIGNING_SECRET
+from .const import DEFAULT_CHECKIN_LINK_ENABLED
+from .const import DEFAULT_CHECKIN_LINK_PATH
+from .const import DEFAULT_CHECKIN_BASE_URL
+from .const import DEFAULT_CHECKIN_SIGNING_SECRET
 from .const import DEFAULT_CODE_GENERATION
 from .const import DEFAULT_CODE_LENGTH
 from .const import DEFAULT_MAX_MISSES
@@ -125,6 +133,18 @@ class RentalControlCoordinator:
         self.event: CalendarEvent | None = None
         self.created: str = config.get(CONF_CREATION_DATETIME, str(dt.now()))
         self._version: str = VERSION
+        self.checkin_link_enabled: bool = bool(
+            config.get(CONF_CHECKIN_LINK_ENABLED, DEFAULT_CHECKIN_LINK_ENABLED)
+        )
+        self.checkin_link_path: str = str(
+            config.get(CONF_CHECKIN_LINK_PATH, DEFAULT_CHECKIN_LINK_PATH)
+        )
+        self.checkin_base_url: str = str(
+            config.get(CONF_CHECKIN_BASE_URL, DEFAULT_CHECKIN_BASE_URL)
+        )
+        self.checkin_signing_secret: str = str(
+            config.get(CONF_CHECKIN_SIGNING_SECRET, DEFAULT_CHECKIN_SIGNING_SECRET)
+        )
 
         # setup device
         device_registry = dr.async_get(hass)
@@ -329,6 +349,18 @@ Please update Keymaster to at least v0.1.0-b0
         self.code_length = config.get(CONF_CODE_LENGTH, DEFAULT_CODE_LENGTH)
         self.ignore_non_reserved = config.get(CONF_IGNORE_NON_RESERVED)
         self.verify_ssl = config.get(CONF_VERIFY_SSL)
+        self.checkin_link_enabled = config.get(
+            CONF_CHECKIN_LINK_ENABLED, DEFAULT_CHECKIN_LINK_ENABLED
+        )
+        self.checkin_link_path = config.get(
+            CONF_CHECKIN_LINK_PATH, DEFAULT_CHECKIN_LINK_PATH
+        )
+        self.checkin_base_url = config.get(
+            CONF_CHECKIN_BASE_URL, DEFAULT_CHECKIN_BASE_URL
+        )
+        self.checkin_signing_secret = config.get(
+            CONF_CHECKIN_SIGNING_SECRET, DEFAULT_CHECKIN_SIGNING_SECRET
+        )
 
         # updated the calendar in case the fetch days has changed
         self.calendar = self._refresh_event_dict()

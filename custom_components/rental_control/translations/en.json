@@ -9,7 +9,11 @@
       "invalid_path": "Path must be a relative path, not absolute",
       "invalid_url": "Only https URLs are supported",
       "same_name": "Name already in use",
-      "unknown": "Unexpected error, check logs for more details"
+      "unknown": "Unexpected error, check logs for more details",
+      "missing_base_url": "Base URL is required when check-in links are enabled",
+      "invalid_base_url": "Base URL must start with http:// or https://",
+      "missing_signing_secret": "Signing secret is required when check-in links are enabled",
+      "must_select_path": "Please select a valid check-in path"
     },
     "step": {
       "user": {
@@ -29,7 +33,11 @@
           "should_update_code": "For date based codes, update the code if future events change start or end dates",
           "timezone": "Calendar Timezone",
           "url": "Calendar URL",
-          "verify_ssl": "Verify SSL certificates"
+          "verify_ssl": "Verify SSL certificates",
+          "checkin_link_enabled": "Enable self check-in links",
+          "checkin_link_path": "Check-in page path",
+          "checkin_base_url": "Base URL for check-in links",
+          "checkin_signing_secret": "HMAC signing secret"
         }
       }
     }
@@ -44,7 +52,11 @@
       "invalid_path": "Path must be a relative path, not absolute",
       "invalid_url": "Only https URLs are supported",
       "same_name": "Name already in use",
-      "unknown": "Unexpected error, check logs for more details"
+      "unknown": "Unexpected error, check logs for more details",
+      "missing_base_url": "Base URL is required when check-in links are enabled",
+      "invalid_base_url": "Base URL must start with http:// or https://",
+      "missing_signing_secret": "Signing secret is required when check-in links are enabled",
+      "must_select_path": "Please select a valid check-in path"
     },
     "step": {
       "init": {
@@ -64,7 +76,11 @@
           "should_update_code": "For date based codes, update the code if future events change start or end dates",
           "timezone": "Calendar Timezone",
           "url": "Calendar URL",
-          "verify_ssl": "Verify SSL certificates"
+          "verify_ssl": "Verify SSL certificates",
+          "checkin_link_enabled": "Enable self check-in links",
+          "checkin_link_path": "Check-in page path",
+          "checkin_base_url": "Base URL for check-in links",
+          "checkin_signing_secret": "HMAC signing secret"
         }
       }
     }

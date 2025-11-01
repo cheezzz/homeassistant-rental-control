@@ -6,13 +6,14 @@
 from __future__ import annotations
 
 from datetime import datetime
+from datetime import time
 import logging
 import random
 import re
 
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity import EntityCategory
-from homeassistant.util import dt as dt
+from homeassistant.util import dt
 
 from ..const import ICON
 from ..util import async_fire_clear_code
@@ -60,6 +61,7 @@ class RentalControlCalSensor(Entity):
             "eta_minutes": None,
             "slot_name": None,
             "slot_code": None,
+            "self_checkin_link": None,
         }
         self._parsed_attributes = {}
         self._event_number = event_number
@@ -208,6 +210,49 @@ class RentalControlCalSensor(Entity):
 
         return ret
 
+    def _generate_checkin_link(self) -> str | None:
+        """Generate HMAC-signed check-in link if enabled and conditions met.
+
+        Links are generated only on check-in day at or after 06:00 AM (in the
+        event's timezone). This ensures links appear early enough for early
+        check-ins while allowing time for cleaning preparation.
+
+        Returns:
+            Signed URL string, or None if feature is disabled or not check-in day
+
+        """
+        # Check if feature is enabled
+        if not self.coordinator.checkin_link_enabled:
+            return None
+
+        # Check if path is set (not "none")
+        if self.coordinator.checkin_link_path == "none":
+            return None
+
+        # Check if we have a valid start time
+        start = self._event_attributes.get("start")
+        if not start:
+            return None
+
+        # Check if today is check-in day and time >= 06:00 AM
+        # Use Home Assistant's timezone-aware now() utility
+        now = dt.now(start.tzinfo)
+        is_checkin_day = start.date() == now.date()
+        is_past_6am = now.time() >= time(6, 0)
+
+        if not (is_checkin_day and is_past_6am):
+            return None
+
+        # Generate the link
+        from ..checkin_links import generate_checkin_link
+
+        return generate_checkin_link(
+            base_url=self.coordinator.checkin_base_url,
+            path=self.coordinator.checkin_link_path,
+            secret=self.coordinator.checkin_signing_secret,
+            expires_in_seconds=86400,  # 24 hours
+        )
+
     @property
     def available(self):
         """Return True if calendar is ready."""
@@ -354,6 +399,9 @@ class RentalControlCalSensor(Entity):
 
             self._parsed_attributes = parsed_attributes
 
+            # Generate self check-in link if enabled and conditions are met
+            self._event_attributes["self_checkin_link"] = self._generate_checkin_link()
+
             # fire set_code if not in current overrides
             if overrides and set_code:
                 await async_fire_set_code(
@@ -406,6 +454,7 @@ class RentalControlCalSensor(Entity):
                 "eta_minutes": None,
                 "slot_name": None,
                 "slot_code": None,
+                "self_checkin_link": None,
             }
             self._parsed_attributes = {}
             self._state = summary

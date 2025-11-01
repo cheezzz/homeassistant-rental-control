@@ -40,6 +40,11 @@ from .const import CONF_REFRESH_FREQUENCY
 from .const import CONF_SHOULD_UPDATE_CODE
 from .const import CONF_START_SLOT
 from .const import CONF_TIMEZONE
+from .const import CONF_CHECKIN_LINK_ENABLED
+from .const import CONF_CHECKIN_LINK_PATH
+from .const import CONF_CHECKIN_BASE_URL
+from .const import CONF_CHECKIN_SIGNING_SECRET
+from .const import CHECKIN_LINK_PATHS
 from .const import DEFAULT_CHECKIN
 from .const import DEFAULT_CHECKOUT
 from .const import DEFAULT_CODE_GENERATION
@@ -51,6 +56,10 @@ from .const import DEFAULT_MAX_EVENTS
 from .const import DEFAULT_REFRESH_FREQUENCY
 from .const import DEFAULT_SHOULD_UPDATE_CODE
 from .const import DEFAULT_START_SLOT
+from .const import DEFAULT_CHECKIN_LINK_ENABLED
+from .const import DEFAULT_CHECKIN_LINK_PATH
+from .const import DEFAULT_CHECKIN_BASE_URL
+from .const import DEFAULT_CHECKIN_SIGNING_SECRET
 from .const import DOMAIN
 from .const import LOCK_MANAGER
 from .const import REQUEST_TIMEOUT
@@ -79,6 +88,10 @@ class RentalControlFlowHandler(config_entries.ConfigFlow):
         CONF_SHOULD_UPDATE_CODE: DEFAULT_SHOULD_UPDATE_CODE,
         CONF_TIMEZONE: str(dt.DEFAULT_TIME_ZONE),
         CONF_VERIFY_SSL: True,
+        CONF_CHECKIN_LINK_ENABLED: DEFAULT_CHECKIN_LINK_ENABLED,
+        CONF_CHECKIN_LINK_PATH: DEFAULT_CHECKIN_LINK_PATH,
+        CONF_CHECKIN_BASE_URL: DEFAULT_CHECKIN_BASE_URL,
+        CONF_CHECKIN_SIGNING_SECRET: DEFAULT_CHECKIN_SIGNING_SECRET,
     }
 
     def __init__(self):
@@ -157,6 +170,30 @@ def _code_generators() -> list:
         data.append(generator["description"])
 
     return data
+
+
+def _checkin_link_paths() -> list:
+    """Return list of available check-in link paths."""
+
+    data = []
+
+    for path_id, path_name in CHECKIN_LINK_PATHS:
+        data.append(path_name)
+
+    return data
+
+
+def _checkin_link_path_convert(path: str, to_id: bool = True) -> str:
+    """Convert between path ID and display name for check-in links."""
+
+    if to_id:
+        return next(
+            item for item in CHECKIN_LINK_PATHS if item[1] == path
+        )[0]
+    else:
+        return next(
+            item for item in CHECKIN_LINK_PATHS if item[0] == path
+        )[1]
 
 
 def _generator_convert(ident: str, to_type: bool = True) -> str:
@@ -293,6 +330,31 @@ def _get_schema(
             vol.Optional(
                 CONF_VERIFY_SSL, default=_get_default(CONF_VERIFY_SSL, True)
             ): cv.boolean,
+            vol.Optional(
+                CONF_CHECKIN_LINK_ENABLED,
+                default=_get_default(
+                    CONF_CHECKIN_LINK_ENABLED, DEFAULT_CHECKIN_LINK_ENABLED
+                ),
+            ): cv.boolean,
+            vol.Optional(
+                CONF_CHECKIN_LINK_PATH,
+                default=_checkin_link_path_convert(
+                    path=str(
+                        _get_default(CONF_CHECKIN_LINK_PATH, DEFAULT_CHECKIN_LINK_PATH)
+                    ),
+                    to_id=False,
+                ),
+            ): vol.In(_checkin_link_paths()),
+            vol.Optional(
+                CONF_CHECKIN_BASE_URL,
+                default=_get_default(CONF_CHECKIN_BASE_URL, DEFAULT_CHECKIN_BASE_URL),
+            ): cv.string,
+            vol.Optional(
+                CONF_CHECKIN_SIGNING_SECRET,
+                default=_get_default(
+                    CONF_CHECKIN_SIGNING_SECRET, DEFAULT_CHECKIN_SIGNING_SECRET
+                ),
+            ): cv.string,
         },
         extra=ALLOW_EXTRA,
     )
@@ -392,6 +454,27 @@ async def _start_config_flow(
         user_input[CONF_CODE_GENERATION] = _generator_convert(
             ident=user_input[CONF_CODE_GENERATION], to_type=True
         )
+
+        # Convert check-in link path to proper ID
+        user_input[CONF_CHECKIN_LINK_PATH] = _checkin_link_path_convert(
+            path=user_input[CONF_CHECKIN_LINK_PATH], to_id=True
+        )
+
+        # Validate check-in link settings if enabled
+        if user_input[CONF_CHECKIN_LINK_ENABLED]:
+            if not user_input[CONF_CHECKIN_BASE_URL]:
+                errors[CONF_CHECKIN_BASE_URL] = "missing_base_url"
+            elif not (
+                user_input[CONF_CHECKIN_BASE_URL].startswith("http://")
+                or user_input[CONF_CHECKIN_BASE_URL].startswith("https://")
+            ):
+                errors[CONF_CHECKIN_BASE_URL] = "invalid_base_url"
+
+            if not user_input[CONF_CHECKIN_SIGNING_SECRET]:
+                errors[CONF_CHECKIN_SIGNING_SECRET] = "missing_signing_secret"
+
+            if user_input[CONF_CHECKIN_LINK_PATH] == "none":
+                errors[CONF_CHECKIN_LINK_PATH] = "must_select_path"
 
         if not errors:
             # Only do this conversion if there are no errors and it needs to be

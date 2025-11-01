@@ -60,6 +60,10 @@ CONF_SHOULD_UPDATE_CODE = "should_update_code"
 CONF_START_SLOT = "start_slot"
 CONF_TIMEZONE = "timezone"
 CONF_URL = "url"
+CONF_CHECKIN_LINK_ENABLED = "checkin_link_enabled"
+CONF_CHECKIN_LINK_PATH = "checkin_link_path"
+CONF_CHECKIN_BASE_URL = "checkin_base_url"
+CONF_CHECKIN_SIGNING_SECRET = "checkin_signing_secret"
 
 # Defaults
 DEFAULT_CHECKIN = "13:30"
@@ -76,6 +80,17 @@ DEFAULT_PATH = "packages/rental_control"
 DEFAULT_REFRESH_FREQUENCY = 2
 DEFAULT_SHOULD_UPDATE_CODE = True
 DEFAULT_START_SLOT = 10
+DEFAULT_CHECKIN_LINK_ENABLED = False
+DEFAULT_CHECKIN_LINK_PATH = "none"
+DEFAULT_CHECKIN_BASE_URL = ""
+DEFAULT_CHECKIN_SIGNING_SECRET = ""
+
+CHECKIN_LINK_PATHS = [
+    ("none", "None"),
+    ("/checkin/cottage", "Cottage"),
+    ("/checkin/tiny-home", "Tiny Home"),
+    ("/checkin/glamping", "Glamping"),
+]
 
 CODE_GENERATORS = [
     {"type": "date_based", "description": "Start/End Date"},
