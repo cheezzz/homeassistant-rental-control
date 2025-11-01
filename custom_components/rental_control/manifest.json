@@ -1,6 +1,7 @@
 {
   "domain": "rental_control",
   "name": "Rental Control",
+  "config_flow": true,
   "documentation": "https://github.com/cheezzz/homeassistant-rental-control",
   "issue_tracker": "https://github.com/cheezzz/homeassistant-rental-control/issues",
   "codeowners": ["@cheezzz"],
