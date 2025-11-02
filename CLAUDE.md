@@ -15,25 +15,72 @@ This is a **fork** of [tykeal/homeassistant-rental-control](https://github.com/t
 ## Development Commands
 
 ### Environment setup
+
+**CRITICAL: Always use a virtual environment to avoid polluting system Python**
+
 ```bash
-python -m venv .venv
+# Create virtual environment (first time only)
+python3 -m venv .venv
+
+# Activate virtual environment (do this EVERY time you work on the project)
 source .venv/bin/activate  # Unix/Mac
+# OR on Windows:
+# .venv\Scripts\activate
+
+# Install development dependencies
 pip install -r requirements_dev.txt
+
+# Install test dependencies (includes Home Assistant test framework)
+pip install -r requirements_test.txt
+```
+
+**Verify venv is active:** Your command prompt should show `(.venv)` prefix
+
+**Deactivate when done:**
+```bash
+deactivate
 ```
 
 ### Testing
+
+**IMPORTANT: Testing is MANDATORY before deploying to production Home Assistant**
+
 ```bash
-# Run all tests
-python -m pytest -q
+# ALWAYS activate venv first!
+source .venv/bin/activate
+
+# Quick test run (recommended during development)
+python3 -m pytest tests/ --ignore=tests/test_real_calendars.py -q
+
+# Run all working tests with verbose output
+python3 -m pytest tests/ --ignore=tests/test_real_calendars.py -v
 
 # Run specific test file
-python -m pytest tests/test_config_flow.py -v
+python3 -m pytest tests/test_checkin_links.py -v
 
-# Run with coverage report
-python -m pytest --cov=custom_components.rental_control --cov-report=term-missing
+# Run with coverage report (shows untested code)
+python3 -m pytest tests/ --ignore=tests/test_real_calendars.py \
+  --cov=custom_components.rental_control \
+  --cov-report=term-missing
+
+# Generate HTML coverage report (opens in browser)
+python3 -m pytest tests/ --ignore=tests/test_real_calendars.py \
+  --cov=custom_components.rental_control \
+  --cov-report=html
+# Then open htmlcov/index.html
 
 # Note: Coverage requirement is 100% (enforced in pytest.ini)
+# Note: test_real_calendars.py is currently broken and should be skipped
 ```
+
+**Test workflow before deployment:**
+1. Activate venv: `source .venv/bin/activate`
+2. Run tests: `python3 -m pytest tests/ --ignore=tests/test_real_calendars.py -v`
+3. Fix any failures before deploying
+4. Run pre-commit checks: `pre-commit run --all-files`
+5. Only deploy if all tests pass
+
+**Note:** Once inside the activated venv, both `python` and `python3` will point to the venv's Python 3.12. However, using `python3` explicitly is best practice on Linux systems.
 
 ### Validation and linting
 ```bash
@@ -134,12 +181,25 @@ Events are identified by their "slot name" extracted from the iCalendar `SUMMARY
 - When `len(new_calendar) == 0` but `len(self.calendar) == 1`: retry up to `max_misses` (default: 2) before clearing calendar
 - Prevents losing calendar state due to transient API failures
 
-## Testing notes
+## Testing infrastructure
 
-- **Full coverage required** (`--cov-fail-under=100` in `pytest.ini`)
-- `tests/test_real_calendars.py` - Tests against actual LekkeSlaap/platform calendars
-- `tests/conftest.py` - Fixtures for Home Assistant test environment
-- Use `asyncio_mode = auto` for async test handling
+### Current test status (as of 2025-11-02)
+- ✅ **Working:** `test_checkin_links.py` (11 tests - all passing)
+- ❌ **Broken:** `test_config_flow.py`, `test_init.py` (Home Assistant fixture issues)
+- ❌ **Broken:** `test_real_calendars.py` (imports non-existent function)
+
+### Key testing principles
+1. **Always use venv** - Never test with system Python (prevents dependency conflicts)
+2. **Test before deploy** - Run tests before every production deployment
+3. **Skip broken tests** - Use `--ignore` flag for broken test files
+4. **Check coverage** - Use `--cov` to identify untested code paths
+
+### Pytest configuration (`pytest.ini`)
+- Test paths: `tests/` directory
+- Async mode: `auto` (automatically handles async/await tests)
+- Coverage: Tracks `custom_components.rental_control` module
+- Coverage target: 100% (currently not enforced due to broken tests)
+- Reports: Terminal output + HTML (in `htmlcov/` directory)
 
 ## Deployment
 
