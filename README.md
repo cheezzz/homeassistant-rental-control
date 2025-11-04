@@ -7,7 +7,7 @@ This is a fork of [homeassistant-rental-control](https://github.com/tykeal/homea
 
 ## Changes from Original
 - Added LekkeSlaap integration support
-- Changed blocked Calendar behavior so it triggers. This is to make sure it works for private bookings. Future development will integrate Google Calendar to replace this behavior.
+- Added functionality so blocked calendars can trigger. That way private bookings also work. I have since used Google Calendar, did not know it was an option. The more you know...
 
 ## Original Project
 Original project by Andrew Grimberg (tykeal): https://github.com/tykeal/homeassistant-rental-control
