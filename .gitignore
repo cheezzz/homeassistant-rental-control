@@ -11,7 +11,7 @@ venv
 test_venv/
 .mypy_cache/
 __pycache__/
-
+screenshots
 # Customer-specific documentation and sensitive data
 *LekkeSlaap*
 Rental Control LekkeSlaap.md
